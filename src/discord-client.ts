@@ -212,6 +212,10 @@ export class DiscordClient {
         } catch (error: any) {
             console.error(`[Discord] Native search failed: ${error.message}. Falling back to fetch.`);
 
+            if (!channel) {
+                throw new Error(`Native search failed and no specific channel was provided for fallback fetch: ${error.message}`);
+            }
+
             // Fallback to fetch if native search fails or is restricted
             const fetchOptions: any = { limit: Math.min(options.limit || 50, 100) };
             if (options.before) fetchOptions.before = options.before;
