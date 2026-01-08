@@ -141,23 +141,33 @@ export class DiscordClient {
     ): Promise<MessageInfo[]> {
         await this.rateLimiter.wait();
 
-        const channel: any = this.client.channels.cache.get(channelId);
-        if (!channel || (!channel.isText() && !channel.isThread())) {
-            throw new Error(`Text channel or thread not found: ${channelId}`);
+        let channel: any = this.client.channels.cache.get(channelId);
+        let guild: any = this.client.guilds.cache.get(channelId);
+        let targetGuildId: string | undefined;
+
+        if (!channel && !guild) {
+            throw new Error(`Target not found: ${channelId}. Is it a valid channel or guild ID?`);
         }
 
-        const permissions = channel.permissionsFor(this.client.user!);
-        if (!permissions?.has("VIEW_CHANNEL")) {
-            throw new Error(`Missing VIEW_CHANNEL permission for channel: ${channelId}`);
-        }
-        if (!permissions?.has("READ_MESSAGE_HISTORY")) {
-            throw new Error(`Missing READ_MESSAGE_HISTORY permission for channel: ${channelId}`);
+        if (guild && !channel) {
+            // It's a guild search
+            targetGuildId = guild.id;
+        } else if (channel) {
+            if (!channel.isText() && !channel.isThread()) {
+                throw new Error(`Channel is not a text channel or thread: ${channelId} (${channel.name || "Unknown"})`);
+            }
+
+            const permissions = channel.permissionsFor(this.client.user!);
+            if (!permissions?.has("VIEW_CHANNEL")) {
+                throw new Error(`Missing VIEW_CHANNEL permission for channel: ${channel.name || channelId}`);
+            }
+            if (!permissions?.has("READ_MESSAGE_HISTORY")) {
+                throw new Error(`Missing READ_MESSAGE_HISTORY permission for channel: ${channel.name || channelId}`);
+            }
+            targetGuildId = channel.guild?.id;
         }
 
-        const guildId = channel.guild?.id;
-        if (!guildId) {
-            throw new Error(`Guild context not found for channel: ${channelId}`);
-        }
+        const guildId = targetGuildId;
 
         try {
             // Use raw API to hit the search endpoint since .search() might be missing in library
@@ -165,7 +175,13 @@ export class DiscordClient {
             const searchParams: any = {};
             if (options.query) searchParams.content = options.query;
             if (options.authorId) searchParams.author_id = options.authorId;
-            if (channelId) searchParams.channel_id = channelId;
+
+            // Only filter by channel if we actually found a channel with this ID
+            // (If channel is undefined, it means we are doing a guild-wide search because guild was found)
+            if (channel) {
+                searchParams.channel_id = channelId;
+            }
+
             if (options.before) searchParams.max_id = options.before;
             if (options.after) searchParams.min_id = options.after;
 
