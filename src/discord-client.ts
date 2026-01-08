@@ -86,10 +86,14 @@ export class DiscordClient {
         }
 
         return guild.channels.cache
-            .filter((channel) => channel.isText())
+            .filter((channel) => {
+                if (!channel.isText()) return false;
+                const permissions = (channel as any).permissionsFor(this.client.user!);
+                return permissions?.has("VIEW_CHANNEL");
+            })
             .map((channel) => ({
                 id: channel.id,
-                name: channel.name,
+                name: (channel as any).name || "Unknown",
                 type: channel.type,
             }));
     }
@@ -103,6 +107,14 @@ export class DiscordClient {
         const channel = this.client.channels.cache.get(channelId);
         if (!channel || !channel.isText()) {
             throw new Error(`Text channel not found: ${channelId}`);
+        }
+
+        const permissions = (channel as any).permissionsFor(this.client.user!);
+        if (!permissions?.has("VIEW_CHANNEL")) {
+            throw new Error(`Missing VIEW_CHANNEL permission for channel: ${channelId}`);
+        }
+        if (!permissions?.has("READ_MESSAGE_HISTORY")) {
+            throw new Error(`Missing READ_MESSAGE_HISTORY permission for channel: ${channelId}`);
         }
 
         const messages = await channel.messages.fetch({ limit: Math.min(limit, 100) });
@@ -132,6 +144,14 @@ export class DiscordClient {
         const channel: any = this.client.channels.cache.get(channelId);
         if (!channel || (!channel.isText() && !channel.isThread())) {
             throw new Error(`Text channel or thread not found: ${channelId}`);
+        }
+
+        const permissions = channel.permissionsFor(this.client.user!);
+        if (!permissions?.has("VIEW_CHANNEL")) {
+            throw new Error(`Missing VIEW_CHANNEL permission for channel: ${channelId}`);
+        }
+        if (!permissions?.has("READ_MESSAGE_HISTORY")) {
+            throw new Error(`Missing READ_MESSAGE_HISTORY permission for channel: ${channelId}`);
         }
 
         const guildId = channel.guild?.id;
