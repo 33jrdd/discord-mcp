@@ -141,17 +141,21 @@ export class DiscordClient {
     ): Promise<MessageInfo[]> {
         await this.rateLimiter.wait();
 
-        let channel: any = this.client.channels.cache.get(channelId);
         let guild: any = this.client.guilds.cache.get(channelId);
+        let channel: any = this.client.channels.cache.get(channelId);
+
+        // If it exists in both, prefer treating it as a Guild if the user explicitly provided it to search_messages
+        // but we need to check if the "channel" is actually just a cached object for the guild (unlikely but possible in some versions)
+        // More importantly, we should check if 'channel' has a 'guild' property (real channel) vs 'guild' being a Guild object.
+
         let targetGuildId: string | undefined;
 
-        if (!channel && !guild) {
-            throw new Error(`Target not found: ${channelId}. Is it a valid channel or guild ID?`);
-        }
-
-        if (guild && !channel) {
-            // It's a guild search
+        if (guild) {
             targetGuildId = guild.id;
+            // Clear channel if it's actually the same as guild to avoid confusion
+            if (channel && channel.id === guild.id && !("type" in channel && channel.isText())) {
+                channel = undefined;
+            }
         } else if (channel) {
             if (!channel.isText() && !channel.isThread()) {
                 throw new Error(`Channel is not a text channel or thread: ${channelId} (${channel.name || "Unknown"})`);
@@ -165,6 +169,10 @@ export class DiscordClient {
                 throw new Error(`Missing READ_MESSAGE_HISTORY permission for channel: ${channel.name || channelId}`);
             }
             targetGuildId = channel.guild?.id;
+        }
+
+        if (!targetGuildId) {
+            throw new Error(`Target not found: ${channelId}. Is it a valid channel or guild ID?`);
         }
 
         const guildId = targetGuildId;
