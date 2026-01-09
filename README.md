@@ -28,22 +28,30 @@ The server communicates via JSON-RPC over `stdio`, allowing Large Language Model
 ## Available Tools
 
 ### `list_guilds`
+
 Lists all servers where the authenticated account is a member.
+
 - **Inputs**: None.
 
 ### `list_channels`
+
 Lists all text channels within a specific server.
+
 - **Arguments**:
   - `guildId` (string): Unique Discord server ID.
 
 ### `read_messages`
+
 Retrieves recent message history from a channel.
+
 - **Arguments**:
   - `channelId` (string): Channel ID.
   - `limit` (number, default: 50): Number of messages to fetch (max 100).
 
 ### `search_messages`
+
 Performs refined message searches using multiple filters.
+
 - **Arguments**:
   - `channelId` (string): Channel ID.
   - `query` (string, optional): Search term.
@@ -51,8 +59,19 @@ Performs refined message searches using multiple filters.
   - `before`/`after` (string, optional): Message IDs for temporal pagination.
   - `limit` (number, default: 50).
 
+### `deep_search`
+
+Performs a deep search on a specific topic within a Discord server/guild to extract information, links, and ideas. This tool retrieves a larger volume of messages than standard search by paginating through results.
+
+- **Arguments**:
+  - `guildId` (string): Unique Discord server/guild ID.
+  - `query` (string): The search query/topic.
+  - `limit` (number, default: 100, max: 500): Max number of messages to retrieve.
+
 ### `generate_report`
+
 Analyzes channel context and prepares a structured report for AI consumption.
+
 - **Arguments**:
   - `channelId` (string): Channel ID.
   - `topic` (string): Central topic for analysis.
@@ -61,22 +80,27 @@ Analyzes channel context and prepares a structured report for AI consumption.
 ## Configuration and Installation
 
 ### Prerequisites
+
 - Node.js v18+
 - NPM or Yarn
 
 ### 1. Installation
+
 ```bash
 npm install
 npm run build
 ```
 
 ### 2. Environment Variables
+
 Create a `.env` file in the root directory:
+
 ```env
 DISCORD_TOKEN="your_user_token_here"
 ```
 
 ### 3. MCP Client Integration
+
 Add the following configuration to your MCP client's `settings.json` (e.g., Claude Desktop):
 
 ```json
