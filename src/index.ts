@@ -51,6 +51,12 @@ const GenerateReportSchema = z.object({
     limit: z.number().min(1).max(100).default(50).describe("Number of messages to analyze (1-100)"),
 });
 
+const DeepSearchSchema = z.object({
+    guildId: z.string().describe("The ID of the Discord server/guild to search in"),
+    query: z.string().describe("The search query/topic"),
+    limit: z.number().min(1).max(500).default(100).describe("Max number of messages to retrieve (default 100, max 500)")
+});
+
 // List available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
@@ -159,6 +165,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         },
                     },
                     required: ["channelId", "topic"],
+                },
+            },
+            {
+                name: "deep_search",
+                description: "Perform a deep search on a specific topic within a Discord server/guild to extract information, links, and ideas. This tool retrieves a larger volume of messages than standard search.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        guildId: {
+                            type: "string",
+                            description: "The ID of the Discord server/guild to search in",
+                        },
+                        query: {
+                            type: "string",
+                            description: "The search query/topic",
+                        },
+                        limit: {
+                            type: "number",
+                            description: "Max number of messages to retrieve (default 100, max 500)",
+                            minimum: 1,
+                            maximum: 500,
+                            default: 100,
+                        },
+                    },
+                    required: ["guildId", "query"],
                 },
             },
         ],
@@ -276,6 +307,30 @@ Based on the ${messages.length} messages above, analyze the topic "${parsed.topi
                     ],
                 };
             }
+
+            case "deep_search": {
+                const parsed = DeepSearchSchema.parse(args);
+                const messages = await discordClient.searchGuildMessages(
+                    parsed.guildId,
+                    parsed.query,
+                    parsed.limit
+                );
+                const guildName = discordClient.getGuildName(parsed.guildId);
+
+                const formattedMessages = messages
+                    .map((m) => `[${m.timestamp}] ${m.author} (in #${m.id /* Only have msg id here, ideally we want channel name but search returns mixed channels */}): ${m.content}`)
+                    .join("\n");
+
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `# Deep Search Report: "${parsed.query}"\n\n## Source\n- **Guild**: ${guildName || parsed.guildId}\n- **Messages Found**: ${messages.length}\n\n## Messages\n${JSON.stringify(messages, null, 2)}\n\n## Instructions for AI\nAnalyze the above messages to extract links, keywords, and ideas relative to the topic "${parsed.query}".`,
+                        },
+                    ],
+                };
+            }
+
 
             default:
                 throw new Error(`Unknown tool: ${name}`);

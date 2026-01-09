@@ -244,6 +244,63 @@ export class DiscordClient {
         }
     }
 
+    async searchGuildMessages(
+        guildId: string,
+        query: string,
+        limit: number = 100
+    ): Promise<MessageInfo[]> {
+        const collectedMessages: MessageInfo[] = [];
+        let before: string | undefined = undefined;
+        // Safety cap to prevent infinite loops or excessive rate limiting if user asks for 10000
+        const MAX_TOTAL_LIMIT = 500;
+        const actualLimit = Math.min(limit, MAX_TOTAL_LIMIT);
+
+        while (collectedMessages.length < actualLimit) {
+            const remaining = actualLimit - collectedMessages.length;
+            // Fetch a batch. Native search usually returns 25 results per page.
+            // We request 'remaining' but the API chunks it anyway.
+            // We reuse searchMessages which wraps the native API.
+            // Note: searchMessages handles 'before' (max_id).
+
+            // We must call the internal native search logic because searchMessages logic is slightly mixed with channel fallback.
+            // To be safe and cleaner, let's call searchMessages with the guildId.
+            // searchMessages is designed to take a "channelId" which can be a guild ID.
+
+            const batch = await this.searchMessages(guildId, {
+                query,
+                limit: 25, // Discord search pages are usually 25 items
+                before
+            });
+
+            if (batch.length === 0) {
+                break;
+            }
+
+            // Filter out duplicates if any (though pagination should prevent this)
+            for (const msg of batch) {
+                if (!collectedMessages.find(m => m.id === msg.id)) {
+                    collectedMessages.push(msg);
+                }
+            }
+
+            // If we got fewer messages than requested (25), we probably hit the end
+            if (batch.length < 25) {
+                break;
+            }
+
+            // Prepare for next page
+            // The last message in the batch is the oldest one in that batch.
+            // We want messages OLDER than that (max_id = last_msg_id)
+            const lastMsg = batch[batch.length - 1];
+            before = lastMsg.id;
+
+            // Simple delay to respect rate limits additionally to the internal one
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        return collectedMessages.slice(0, actualLimit);
+    }
+
     getGuildName(guildId: string): string | undefined {
         return this.client.guilds.cache.get(guildId)?.name;
     }
